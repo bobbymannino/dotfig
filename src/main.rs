@@ -1,4 +1,5 @@
 mod config;
+mod paths;
 mod utils;
 
 use std::{path::PathBuf, process::ExitCode};
@@ -47,7 +48,35 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    info!("Loaded {} path(s) from {}", config.paths.len(), config_path.display());
+    let registry = match paths::Registry::load() {
+        Ok(registry) => registry,
+        Err(err) => {
+            error!("{err:#}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let mut resolved = Vec::with_capacity(config.paths.len());
+    let mut invalid = 0_usize;
+
+    for key in &config.paths {
+        if let Some(known) = registry.get(key) {
+            resolved.push(known);
+        } else {
+            warn!("Unknown path `{key}`, skipping");
+            invalid += 1;
+        }
+    }
+
+    if invalid > 0 {
+        warn!("Skipped {invalid} unknown path(s), check them against paths.json");
+    }
+
+    info!("Resolved {} path(s) from {}", resolved.len(), config_path.display());
+
+    for known in &resolved {
+        info!("  {}:{} -> {}", known.group, known.title, known.path);
+    }
 
     ExitCode::SUCCESS
 }
