@@ -1,0 +1,14 @@
+{
+  "paths": [
+    {
+      "group": "Zed",
+      "title": "Settings",
+      "path": "~/.config/zed/settings.json"
+    },
+    {
+      "group": "Zed",
+      "title": "Key Map",
+      "path": "~/.config/zed/keymap.json"
+    }
+  ]
+}
