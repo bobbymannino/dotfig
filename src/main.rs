@@ -1,6 +1,7 @@
+mod config;
 mod utils;
 
-use std::process::ExitCode;
+use std::{path::PathBuf, process::ExitCode};
 
 use clap::Parser;
 use tracing::{error, info, warn};
@@ -21,15 +22,32 @@ fn main() -> ExitCode {
 
     let args = Args::parse();
 
-    let config_file_exists = utils::does_file_exist(&args.config);
-    if config_file_exists.is_err() {
+    let config_path = if let Ok(path) = utils::does_file_exist(&args.config) {
+        path
+    } else {
         warn!("Config file {} does not exist, creating now...", &args.config);
         if let Err(err) = std::fs::write(&args.config, "{}") {
             error!("Failed to create config file: {}", err);
             return ExitCode::FAILURE;
-        };
-        info!("Config file created successfully.");
+        }
+        info!("Config file created successfully");
+        PathBuf::from(&args.config)
     };
+
+    let config = match config::Config::from_file(&config_path) {
+        Ok(config) => config,
+        Err(err) => {
+            error!("{err:#}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if config.paths.is_empty() {
+        info!("There are no paths loaded so nothing will be restored or backed up");
+        return ExitCode::SUCCESS;
+    }
+
+    info!("Loaded {} path(s) from {}", config.paths.len(), config_path.display());
 
     ExitCode::SUCCESS
 }
