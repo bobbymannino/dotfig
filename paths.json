@@ -9,6 +9,31 @@
       "group": "Zed",
       "title": "Key Map",
       "path": "~/.config/zed/keymap.json"
+    },
+    {
+      "group": "Git",
+      "title": "Config",
+      "path": "~/.gitconfig"
+    },
+    {
+      "group": "Zsh",
+      "title": "Config",
+      "path": "~/.zshrc"
+    },
+    {
+      "group": "GitHub",
+      "title": "Config",
+      "path": "~/.config/gh/config.yml"
+    },
+    {
+      "group": "Ghostty",
+      "title": "Config",
+      "path": "~/.config/ghostty/config"
+    },
+    {
+      "group": "Lazygit",
+      "title": "Config",
+      "path": "~/Library/Application Support/lazygit/config.yml"
     }
   ]
 }
