@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 
-use crate::paths::KnownPath;
+use crate::{paths::KnownPath, utils::expand_home};
 
 /// What happened to a single path.
 #[derive(Debug)]
@@ -14,21 +14,6 @@ pub(crate) enum Outcome {
     Copied(PathBuf),
     /// There was nothing to copy at this source.
     Missing(PathBuf),
-}
-
-/// Expand a leading `~/` into the user's home directory.
-///
-/// # Errors
-///
-/// Returns an error if the path starts with `~/` and the home directory cannot be found.
-pub(crate) fn expand_home(path: &str) -> Result<PathBuf> {
-    let Some(rest) = path.strip_prefix("~/") else {
-        return Ok(PathBuf::from(path));
-    };
-
-    let home = std::env::home_dir().context("Could not find your home directory")?;
-
-    Ok(home.join(rest))
 }
 
 /// Where `known` lives inside the backup directory.
@@ -92,23 +77,6 @@ mod tests {
             backup_path(Path::new("/tmp/backups"), &known("Zed", "Key Map", "~/.config/zed/keymap.json")),
             PathBuf::from("/tmp/backups/Zed/Key Map")
         );
-    }
-
-    #[test]
-    fn absolute_paths_are_left_alone() {
-        assert_eq!(expand_home("/etc/hosts").unwrap(), PathBuf::from("/etc/hosts"));
-    }
-
-    #[test]
-    fn a_leading_tilde_becomes_the_home_directory() {
-        let home = std::env::home_dir().unwrap();
-
-        assert_eq!(expand_home("~/.zshrc").unwrap(), home.join(".zshrc"));
-    }
-
-    #[test]
-    fn a_tilde_elsewhere_is_not_expanded() {
-        assert_eq!(expand_home("/tmp/~/file").unwrap(), PathBuf::from("/tmp/~/file"));
     }
 
     #[test]

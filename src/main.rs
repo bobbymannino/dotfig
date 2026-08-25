@@ -140,8 +140,8 @@ fn run(action: &Action, config_path: &Path) -> Result<ExitCode> {
         Action::Add(raw) => add(&mut config, &registry, raw, config_path),
         Action::Remove(raw) => remove(&mut config, raw, config_path),
         Action::List { all: true } => Ok(list_all(&config, &registry)),
-        Action::List { all: false } => Ok(list(&config, &registry)),
-        Action::Backup | Action::Restore => Ok(transfer(action, &config, &registry, config_path)),
+        Action::List { all: false } => list(&config, &registry, config_path),
+        Action::Backup | Action::Restore => transfer(action, &config, &registry, config_path),
     }
 }
 
@@ -187,11 +187,13 @@ fn remove(config: &mut Config, raw: &str, config_path: &Path) -> Result<ExitCode
 }
 
 /// List the paths in the config.
-fn list(config: &Config, registry: &Registry) -> ExitCode {
+fn list(config: &Config, registry: &Registry, config_path: &Path) -> Result<ExitCode> {
+    info!("Backups are kept in {}", config.backups_dir(config_path)?.display());
+
     if config.paths.is_empty() {
         info!("No paths configured, add one with --add Group:Title");
 
-        return ExitCode::SUCCESS;
+        return Ok(ExitCode::SUCCESS);
     }
 
     let mut unknown = 0_usize;
@@ -211,7 +213,7 @@ fn list(config: &Config, registry: &Registry) -> ExitCode {
         warn!("{unknown} path(s) cannot be backed up, remove them with --remove");
     }
 
-    ExitCode::SUCCESS
+    Ok(ExitCode::SUCCESS)
 }
 
 /// List every path in `paths.json`, marking the ones already configured.
@@ -234,11 +236,11 @@ fn list_all(config: &Config, registry: &Registry) -> ExitCode {
 }
 
 /// Back up or restore every configured path.
-fn transfer(action: &Action, config: &Config, registry: &Registry, config_path: &Path) -> ExitCode {
+fn transfer(action: &Action, config: &Config, registry: &Registry, config_path: &Path) -> Result<ExitCode> {
     if config.paths.is_empty() {
         info!("There are no paths loaded so nothing will be restored or backed up");
 
-        return ExitCode::SUCCESS;
+        return Ok(ExitCode::SUCCESS);
     }
 
     let mut resolved = Vec::with_capacity(config.paths.len());
@@ -259,9 +261,7 @@ fn transfer(action: &Action, config: &Config, registry: &Registry, config_path: 
 
     info!("Resolved {} path(s) from {}", resolved.len(), config_path.display());
 
-    let backups = config_path
-        .parent()
-        .map_or_else(|| PathBuf::from("backups"), |parent| parent.join("backups"));
+    let backups = config.backups_dir(config_path)?;
 
     let restoring = action == &Action::Restore;
 
@@ -300,5 +300,5 @@ fn transfer(action: &Action, config: &Config, registry: &Registry, config_path: 
 
     info!("{copied} copied, {missing} missing, {failed} failed");
 
-    if failed > 0 { ExitCode::FAILURE } else { ExitCode::SUCCESS }
+    Ok(if failed > 0 { ExitCode::FAILURE } else { ExitCode::SUCCESS })
 }
