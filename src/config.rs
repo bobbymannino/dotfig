@@ -1,7 +1,7 @@
 use std::{fmt, fs, path::Path, str::FromStr};
 
 use anyhow::{Context, Result, bail};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize, Serializer};
 
 /// A reference to an entry in `paths.json`, written as `"Group:Title"`.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -46,8 +46,21 @@ impl fmt::Display for PathKey {
     }
 }
 
+impl Serialize for PathKey {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+}
+
+impl PathKey {
+    /// Whether both keys name the same entry, ignoring case as lookups do.
+    pub(crate) fn matches(&self, other: &Self) -> bool {
+        self.group.eq_ignore_ascii_case(&other.group) && self.title.eq_ignore_ascii_case(&other.title)
+    }
+}
+
 /// The contents of the config file.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Config {
     /// The paths to back up, each referencing an entry in `paths.json`.
@@ -66,5 +79,37 @@ impl Config {
         let contents = fs::read_to_string(path).with_context(|| format!("Could not read {}", path.display()))?;
 
         serde_json::from_str(&contents).with_context(|| format!("Could not parse {}", path.display()))
+    }
+
+    /// Write the config back to `path`, replacing what is there.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the config cannot be serialised or the file cannot be written.
+    pub(crate) fn to_file(&self, path: &Path) -> Result<()> {
+        let mut contents = serde_json::to_string_pretty(self).context("Could not serialise the config")?;
+        contents.push('\n');
+
+        fs::write(path, contents).with_context(|| format!("Could not write {}", path.display()))
+    }
+
+    /// Add `key`, reporting whether it was not already there.
+    pub(crate) fn add(&mut self, key: PathKey) -> bool {
+        if self.paths.iter().any(|existing| existing.matches(&key)) {
+            return false;
+        }
+
+        self.paths.push(key);
+
+        true
+    }
+
+    /// Remove `key`, reporting whether it was there to remove.
+    pub(crate) fn remove(&mut self, key: &PathKey) -> bool {
+        let before = self.paths.len();
+
+        self.paths.retain(|existing| !existing.matches(key));
+
+        self.paths.len() != before
     }
 }

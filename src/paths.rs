@@ -20,6 +20,14 @@ impl KnownPath {
     fn matches(&self, key: &PathKey) -> bool {
         self.group.eq_ignore_ascii_case(&key.group) && self.title.eq_ignore_ascii_case(&key.title)
     }
+
+    /// The key that names this entry, spelled as `paths.json` spells it.
+    pub(crate) fn key(&self) -> PathKey {
+        PathKey {
+            group: self.group.clone(),
+            title: self.title.clone(),
+        }
+    }
 }
 
 /// Every path dotfig knows how to back up.
