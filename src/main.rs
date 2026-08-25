@@ -1,5 +1,6 @@
 mod config;
 mod paths;
+mod sync;
 mod utils;
 
 use std::{path::PathBuf, process::ExitCode};
@@ -13,6 +14,34 @@ use tracing::{error, info, warn};
 struct Args {
     #[clap(short, long, default_value = "dotfig.json")]
     config: String,
+
+    /// Back up the configured paths
+    #[clap(short, long, group = "action")]
+    backup: bool,
+
+    /// Restore the configured paths from their backups
+    #[clap(short, long, group = "action")]
+    restore: bool,
+}
+
+/// What the user asked dotfig to do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Action {
+    Backup,
+    Restore,
+}
+
+impl Args {
+    /// The requested action, if one was given.
+    ///
+    /// Clap guarantees `backup` and `restore` are never both set.
+    fn action(&self) -> Option<Action> {
+        match (self.backup, self.restore) {
+            (true, _) => Some(Action::Backup),
+            (_, true) => Some(Action::Restore),
+            _ => None,
+        }
+    }
 }
 
 fn main() -> ExitCode {
@@ -22,6 +51,11 @@ fn main() -> ExitCode {
         .init();
 
     let args = Args::parse();
+
+    let Some(action) = args.action() else {
+        warn!("Nothing to do, pass --backup or --restore");
+        return ExitCode::FAILURE;
+    };
 
     let config_path = if let Ok(path) = utils::does_file_exist(&args.config) {
         path
@@ -74,9 +108,42 @@ fn main() -> ExitCode {
 
     info!("Resolved {} path(s) from {}", resolved.len(), config_path.display());
 
-    for known in &resolved {
-        info!("  {}:{} -> {}", known.group, known.title, known.path);
+    let backups = config_path
+        .parent()
+        .map_or_else(|| PathBuf::from("backups"), |parent| parent.join("backups"));
+
+    match action {
+        Action::Backup => info!("Backing up {} path(s) to {}", resolved.len(), backups.display()),
+        Action::Restore => info!("Restoring {} path(s) from {}", resolved.len(), backups.display()),
     }
 
-    ExitCode::SUCCESS
+    let mut copied = 0_usize;
+    let mut missing = 0_usize;
+    let mut failed = 0_usize;
+
+    for known in &resolved {
+        let result = match action {
+            Action::Backup => sync::backup(&backups, known),
+            Action::Restore => sync::restore(&backups, known),
+        };
+
+        match result {
+            Ok(sync::Outcome::Copied(to)) => {
+                info!("  {}:{} -> {}", known.group, known.title, to.display());
+                copied += 1;
+            }
+            Ok(sync::Outcome::Missing(from)) => {
+                warn!("  {}:{} has nothing at {}, skipping", known.group, known.title, from.display());
+                missing += 1;
+            }
+            Err(err) => {
+                error!("  {}:{} failed: {err:#}", known.group, known.title);
+                failed += 1;
+            }
+        }
+    }
+
+    info!("{copied} copied, {missing} missing, {failed} failed");
+
+    if failed > 0 { ExitCode::FAILURE } else { ExitCode::SUCCESS }
 }
