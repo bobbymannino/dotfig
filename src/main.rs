@@ -9,7 +9,7 @@ use std::{
 };
 
 use anyhow::{Result, bail};
-use clap::Parser;
+use clap::{CommandFactory, Parser, error::ErrorKind};
 use tracing::{error, info, warn};
 
 use crate::{
@@ -20,6 +20,8 @@ use crate::{
 /// A simple CLI tool for creating and restoring backups for your dot files.
 #[derive(Parser, Debug)]
 #[command(version, about)]
+// The bools are command line flags, collapsing them into an enum would hide them from clap.
+#[allow(clippy::struct_excessive_bools)]
 struct Args {
     #[clap(short, long, default_value = "dotfig.json")]
     config: String,
@@ -43,6 +45,12 @@ struct Args {
     /// Remove a path from your config, as `Group:Title`
     #[clap(long, group = "action", value_name = "PATH")]
     remove: Option<String>,
+
+    /// With --list, list every path dotfig knows about instead of your config
+    ///
+    /// `requires` is no use here, clap counts a `SetTrue` flag as always present, so this is checked by hand.
+    #[clap(long)]
+    all: bool,
 }
 
 /// What the user asked dotfig to do.
@@ -50,7 +58,10 @@ struct Args {
 enum Action {
     Backup,
     Restore,
-    List,
+    /// List the config, or the whole registry when `all` is set.
+    List {
+        all: bool,
+    },
     Add(String),
     Remove(String),
 }
@@ -69,7 +80,7 @@ impl Args {
         }
 
         if self.list {
-            return Some(Action::List);
+            return Some(Action::List { all: self.all });
         }
 
         if let Some(raw) = &self.add {
@@ -87,6 +98,12 @@ fn main() -> ExitCode {
         .init();
 
     let args = Args::parse();
+
+    if args.all && !args.list {
+        Args::command()
+            .error(ErrorKind::MissingRequiredArgument, "--all can only be used with --list")
+            .exit();
+    }
 
     let Some(action) = args.action() else {
         warn!("Nothing to do, pass --backup, --restore, --list, --add or --remove");
@@ -122,7 +139,8 @@ fn run(action: &Action, config_path: &Path) -> Result<ExitCode> {
     match action {
         Action::Add(raw) => add(&mut config, &registry, raw, config_path),
         Action::Remove(raw) => remove(&mut config, raw, config_path),
-        Action::List => Ok(list(&config, &registry)),
+        Action::List { all: true } => Ok(list_all(&config, &registry)),
+        Action::List { all: false } => Ok(list(&config, &registry)),
         Action::Backup | Action::Restore => Ok(transfer(action, &config, &registry, config_path)),
     }
 }
@@ -191,6 +209,25 @@ fn list(config: &Config, registry: &Registry) -> ExitCode {
 
     if unknown > 0 {
         warn!("{unknown} path(s) cannot be backed up, remove them with --remove");
+    }
+
+    ExitCode::SUCCESS
+}
+
+/// List every path in `paths.json`, marking the ones already configured.
+fn list_all(config: &Config, registry: &Registry) -> ExitCode {
+    let known_paths = registry.all();
+
+    info!("{} path(s) available, add one with --add Group:Title", known_paths.len());
+
+    for known in known_paths {
+        let key = known.key();
+
+        if config.paths.iter().any(|configured| configured.matches(&key)) {
+            info!("  {key} -> {} (in your config)", known.path);
+        } else {
+            info!("  {key} -> {}", known.path);
+        }
     }
 
     ExitCode::SUCCESS

@@ -47,6 +47,11 @@ impl Registry {
         serde_json::from_str(PATHS_JSON).context("Could not parse the built in paths.json")
     }
 
+    /// Every entry, in the order `paths.json` lists them.
+    pub(crate) fn all(&self) -> &[KnownPath] {
+        &self.paths
+    }
+
     /// Look up the entry `key` refers to, if there is one.
     pub(crate) fn get(&self, key: &PathKey) -> Option<&KnownPath> {
         self.paths.iter().find(|known| known.matches(key))
