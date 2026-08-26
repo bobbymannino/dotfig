@@ -12,7 +12,7 @@ use crate::utils::expand_home;
 /// A reference to an entry in `paths.json`, written as `"Group:Title"`.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(try_from = "String")]
-pub(crate) struct PathKey {
+pub struct PathKey {
     pub(crate) group: String,
     pub(crate) title: String,
 }
@@ -68,7 +68,7 @@ impl PathKey {
 /// The contents of the config file.
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub(crate) struct Config {
+pub struct Config {
     /// The paths to back up, each referencing an entry in `paths.json`.
     #[serde(default)]
     pub(crate) paths: Vec<PathKey>,

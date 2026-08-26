@@ -205,7 +205,7 @@ fn list(config: &Config, registry: &Registry, config_path: &Path) -> Result<Exit
             info!("  {key} -> {}", known.path);
         } else {
             warn!("  {key} is not one of the paths dotfig knows about");
-            unknown += 1;
+            unknown = unknown.strict_add(1);
         }
     }
 
@@ -251,7 +251,7 @@ fn transfer(action: &Action, config: &Config, registry: &Registry, config_path: 
             resolved.push(known);
         } else {
             warn!("Unknown path `{key}`, skipping");
-            invalid += 1;
+            invalid = invalid.strict_add(1);
         }
     }
 
@@ -285,15 +285,15 @@ fn transfer(action: &Action, config: &Config, registry: &Registry, config_path: 
         match result {
             Ok(sync::Outcome::Copied(to)) => {
                 info!("  {}:{} -> {}", known.group, known.title, to.display());
-                copied += 1;
+                copied = copied.strict_add(1);
             }
             Ok(sync::Outcome::Missing(from)) => {
                 warn!("  {}:{} has nothing at {}, skipping", known.group, known.title, from.display());
-                missing += 1;
+                missing = missing.strict_add(1);
             }
             Err(err) => {
                 error!("  {}:{} failed: {err:#}", known.group, known.title);
-                failed += 1;
+                failed = failed.strict_add(1);
             }
         }
     }

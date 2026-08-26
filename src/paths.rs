@@ -9,7 +9,7 @@ const PATHS_JSON: &str = include_str!("../paths.json");
 /// A single known path from `paths.json`.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct KnownPath {
+pub struct KnownPath {
     pub(crate) group: String,
     pub(crate) title: String,
     pub(crate) path: String,
@@ -33,7 +33,7 @@ impl KnownPath {
 /// Every path dotfig knows how to back up.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Registry {
+pub struct Registry {
     paths: Vec<KnownPath>,
 }
 

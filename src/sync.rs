@@ -9,7 +9,7 @@ use crate::{paths::KnownPath, utils::expand_home};
 
 /// What happened to a single path.
 #[derive(Debug)]
-pub(crate) enum Outcome {
+pub enum Outcome {
     /// The file was copied to this destination.
     Copied(PathBuf),
     /// There was nothing to copy at this source.
@@ -17,7 +17,7 @@ pub(crate) enum Outcome {
 }
 
 /// Where `known` lives inside the backup directory.
-pub(crate) fn backup_path(root: &Path, known: &KnownPath) -> PathBuf {
+pub fn backup_path(root: &Path, known: &KnownPath) -> PathBuf {
     root.join(&known.group).join(&known.title)
 }
 
@@ -26,7 +26,7 @@ pub(crate) fn backup_path(root: &Path, known: &KnownPath) -> PathBuf {
 /// # Errors
 ///
 /// Returns an error if the home directory cannot be found, the source is not a file, or the copy fails.
-pub(crate) fn backup(root: &Path, known: &KnownPath) -> Result<Outcome> {
+pub fn backup(root: &Path, known: &KnownPath) -> Result<Outcome> {
     copy(&expand_home(&known.path)?, &backup_path(root, known))
 }
 
@@ -35,7 +35,7 @@ pub(crate) fn backup(root: &Path, known: &KnownPath) -> Result<Outcome> {
 /// # Errors
 ///
 /// Returns an error if the home directory cannot be found, the backup is not a file, or the copy fails.
-pub(crate) fn restore(root: &Path, known: &KnownPath) -> Result<Outcome> {
+pub fn restore(root: &Path, known: &KnownPath) -> Result<Outcome> {
     copy(&backup_path(root, known), &expand_home(&known.path)?)
 }
 
